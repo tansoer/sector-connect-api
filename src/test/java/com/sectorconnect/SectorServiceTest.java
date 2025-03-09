@@ -114,6 +114,34 @@ class SectorServiceTest {
     }
 
     @Test
+    void testSectorsWithSubSectorsArePrioritized() {
+        // Given
+        Sector parentSector = new Sector(1L, "Parent Sector", false, null, new HashSet<>(), new HashSet<>(), LocalDateTime.now());
+        Sector standaloneSector = new Sector(2L, "Standalone Sector", false, null, new HashSet<>(), new HashSet<>(), LocalDateTime.now());
+        Sector childSector = new Sector(3L, "Child Sector", false, parentSector, new HashSet<>(), new HashSet<>(), LocalDateTime.now());
+        parentSector.getSubSectors().add(childSector);
+
+        // Initially out of order
+        List<Sector> unorderedSectors = List.of(standaloneSector, parentSector);
+
+        // Mock repository and mapper
+        when(sectorRepository.findByParentSectorIsNull()).thenReturn(unorderedSectors);
+        when(sectorMapper.toDto(any())).thenAnswer(invocation -> {
+            Sector sector = invocation.getArgument(0);
+            return new SectorDto(sector.getId(), sector.getName(), sector.isSelectable(), null, new ArrayList<>());
+        });
+
+        // When
+        List<SectorDto> sortedSectors = sectorService.getSectors();
+
+        // Then
+        Assertions.assertNotNull(sortedSectors);
+        Assertions.assertEquals(2, sortedSectors.size());
+        Assertions.assertEquals("Parent Sector", sortedSectors.get(0).getName());
+        Assertions.assertEquals("Standalone Sector", sortedSectors.get(1).getName());
+    }
+
+    @Test
     void testGetSectors_EmptyDatabase() {
         // Given
         when(sectorRepository.findByParentSectorIsNull()).thenReturn(List.of());
